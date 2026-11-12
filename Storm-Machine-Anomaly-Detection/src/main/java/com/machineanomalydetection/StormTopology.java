@@ -1,10 +1,9 @@
 package com.machineanomalydetection;
 
 import org.apache.storm.Config;
-import org.apache.storm.LocalCluster;
+import org.apache.storm.StormSubmitter;
 import org.apache.storm.topology.TopologyBuilder;
 import org.apache.storm.tuple.Fields;
-import org.apache.storm.utils.Utils;
 
 public class StormTopology {
 
@@ -12,43 +11,37 @@ public class StormTopology {
 
         TopologyBuilder builder = new TopologyBuilder();
 
-        // 1. Source: generate random sensor data.
+        // 1. Source
         builder.setSpout(
                 "mgtt-source",
-                new MqttSourceSpout(),
-                1
+                new MqttSourceSpout(), 1
         );
 
-        // 2. Filter: validate readings.
+        // 2. Filter
         builder.setBolt(
                 "filter-operator",
-                new FilterBolt(),
-                2
+                new FilterBolt(), 2
         ).shuffleGrouping("mgtt-source");
 
-        // 3. Feature extraction: group by machine so that
-        // readings for each machine reach the same task.
+        // 3. Feature extraction
         builder.setBolt(
                 "feature-operator",
-                new FeatureBolt(),
-                2
+                new FeatureBolt(), 2
         ).fieldsGrouping(
                 "filter-operator",
                 new Fields("machine_id")
         );
 
-        // 4. Diagnosis: classify the extracted features.
+        // 4. Diagnosis
         builder.setBolt(
                 "expand-operator",
-                new ExpandBolt(),
-                2
+                new ExpandBolt(), 2
         ).shuffleGrouping("feature-operator");
 
-        // 5. Print: display the final diagnosis.
+        // 5. Print
         builder.setBolt(
                 "print-operator",
-                new PrintBolt(),
-                1
+                new PrintBolt(), 1
         ).shuffleGrouping("expand-operator");
 
         Config config = new Config();
@@ -57,24 +50,11 @@ public class StormTopology {
 
         String topologyName = "sensor-processing-topology";
 
-        LocalCluster cluster = new LocalCluster();
-
-        try {
-            cluster.submitTopology(
-                    topologyName,
-                    config,
-                    builder.createTopology()
-            );
-
-            System.out.println("Topology started.");
-
-            Utils.sleep(30000);
-
-        } finally {
-            cluster.killTopology(topologyName);
-            cluster.shutdown();
-        }
-
-        System.out.println("Topology stopped.");
+        StormSubmitter.submitTopology(
+                topologyName,
+                config,
+                builder.createTopology()
+        );
+        System.out.println("Topology submitted successfully.");
     }
 }
